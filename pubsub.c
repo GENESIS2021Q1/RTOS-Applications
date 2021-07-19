@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "MQTTClient.h"
 #include<pthread.h>
+#include<semaphore.h>
 
 #define ADDRESS     "tcp://broker.hivemq.com:1883"
 #define CLIENTID    "Bharath-pub-sub"
@@ -15,6 +16,8 @@
 volatile MQTTClient_deliveryToken deliveredtoken;
 
 MQTTClient client;
+sem_t s1;
+
 void delivered(void *context, MQTTClient_deliveryToken dt)
 {
     printf("Message with token value %d delivery confirmed\n", dt);
@@ -45,6 +48,7 @@ void connlost(void *context, char *cause)
 
 void* publish_task(void* args)
 {
+    sem_wait(&s1);
     int rc;
         char Data[100] = PAYLOAD;
     time_t rawtime;
@@ -85,6 +89,7 @@ void* subscribe_task(void* args)
     printf("Subscribing to topic %s\nfor client %s using QoS%d\n\n"
            "Press Q<Enter> to quit\n\n", TOPIC, CLIENTID, QOS);
     MQTTClient_subscribe(client, TOPIC, QOS);
+    sem_post(&s1);
     do
     {
         sleep(1);
@@ -95,9 +100,11 @@ int main(int argc, char* argv[])
 {
     
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
-    
-    
     int rc;
+
+    void* exit_status_sub = NULL;
+    void* exit_status_pub = NULL;
+	pthread_t pub_pt, sub_pt;
 
     MQTTClient_create(&client, ADDRESS, CLIENTID,
         MQTTCLIENT_PERSISTENCE_NONE, NULL);
@@ -111,14 +118,13 @@ int main(int argc, char* argv[])
         printf("Failed to connect, return code %d\n", rc);
         exit(-1);
     }
-   
-    void* exit_status_sub = NULL;
-    void* exit_status_pub = NULL;
-	pthread_t pub_pt, sub_pt;
+   	sem_init(&s1,0,0);
+   // sem_init(&s2,0,1);
 	pthread_create(&pub_pt,NULL,publish_task,"Thread");
-    pthread_join(pub_pt,&exit_status_pub);
-    
     pthread_create(&sub_pt,NULL,subscribe_task,"Thread");
+
+    
+    pthread_join(pub_pt,&exit_status_pub);
     pthread_join(sub_pt,&exit_status_sub);
     
     MQTTClient_disconnect(client, 10000);

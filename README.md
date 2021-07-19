@@ -10,5 +10,7 @@
 * Message Queue
 
 # Thread
-* Thread-1 Send/Publish
+* Thread-1 Send/Publish 
 * Thread2- Subscribe/Listen message
+
+## Semaphore - Mutex
