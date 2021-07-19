@@ -1,13 +1,15 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include <time.h>
+#include <unistd.h>
 #include "MQTTClient.h"
 #include<pthread.h>
 
 #define ADDRESS     "tcp://broker.hivemq.com:1883"
 #define CLIENTID    "Bharath-pub-sub"
 #define TOPIC       "Demo"
-#define PAYLOAD     "Hi, from Bharath"
+#define PAYLOAD     "Device - HB : "
 #define QOS         1
 #define TIMEOUT     10000L
 volatile MQTTClient_deliveryToken deliveredtoken;
@@ -44,18 +46,37 @@ void connlost(void *context, char *cause)
 void* publish_task(void* args)
 {
     int rc;
+        char Data[100] = PAYLOAD;
+    time_t rawtime;
+    struct tm *timeinfo;
     MQTTClient_deliveryToken token;
     MQTTClient_message pubmsg = MQTTClient_message_initializer;
-    pubmsg.payload = PAYLOAD;
-    pubmsg.payloadlen = strlen(PAYLOAD);
-    pubmsg.qos = QOS;
-    pubmsg.retained = 0;
-    MQTTClient_publishMessage(client, TOPIC, &pubmsg, &token);
-    printf("Waiting for up to %d seconds for publication of %s\n"
-            "on topic %s for client with ClientID: %s\n",
-            (int)(TIMEOUT/1000), PAYLOAD, TOPIC, CLIENTID);
-    rc = MQTTClient_waitForCompletion(client, token, TIMEOUT);
-    pthread_exit(rc);    
+   
+    for (int i = 0; i < 10; i++)
+    {
+        time(&rawtime);
+        timeinfo = localtime(&rawtime);
+
+        memset(Data, 0, 100);
+        strcat(Data, PAYLOAD);
+        strcat(Data, asctime(timeinfo));
+
+        //    pubmsg.payload = PAYLOAD;
+        //    pubmsg.payloadlen = strlen(PAYLOAD);
+        pubmsg.payload = Data;
+        pubmsg.payloadlen = strlen(Data);
+        pubmsg.qos = QOS;
+        pubmsg.retained = 0;
+
+        MQTTClient_publishMessage(client, TOPIC, &pubmsg, &token);
+        printf("Waiting for up to %d seconds for publication of %s\n"
+               "on topic %s for client with ClientID: %s\n",
+               (int)(TIMEOUT / 1000), PAYLOAD, TOPIC, CLIENTID);
+        rc = MQTTClient_waitForCompletion(client, token, TIMEOUT);
+
+        printf("Message with delivery token %d delivered\n", token);
+        sleep(1);
+    }
 
 }
 void* subscribe_task(void* args)
